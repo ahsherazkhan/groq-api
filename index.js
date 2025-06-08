@@ -20,7 +20,7 @@ app.use(express.json());
 const GROQ_KEY = process.env.GROQ_API_KEY;
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-app.post('/ai-analyze', async (req, res) => {
+app.post('/ai_analyze', async (req, res) => {
   const { text } = req.body;
   if (!text || text.length < 20) {
     return res.status(400).json({ error: 'Text too short' });
