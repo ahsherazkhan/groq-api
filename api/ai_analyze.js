@@ -1,36 +1,31 @@
-require('dotenv').config();
-const express = require('express');
-const fetch = require('node-fetch');
-const cors = require('cors');
+// File: api/ai_analyze.js
+// This should be placed in an 'api' folder in your project root
 
-const app = express();
-
-app.use((req, res, next) => {
+export default async function handler(req, res) {
+  // Handle CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+    return res.status(200).end();
   }
-  next();
-});
 
-app.use(express.json());
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-const GROQ_KEY = process.env.GROQ_API_KEY;
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-
-app.post('/ai_analyze', async (req, res) => {
   const { text } = req.body;
   if (!text || text.length < 20) {
     return res.status(400).json({ error: 'Text too short' });
   }
+
   const prompt = `
     You are an expert AI-text detector. Check the text for these cues:
     1. Low lexical diversity (few unique words)  
     2. Low burstiness (sentences are very similar in length)  
     3. Overuse of common words (high Zipf frequency)  
-    4. Excess transition words (“however,” “moreover,” “thus”)  
+    4. Excess transition words ("however," "moreover," "thus")  
     5. Perfect grammar (no typos, slang, or contractions)  
     6. Lack of personal detail (no anecdotes or specifics)  
     7. Unnatural phrasing or flow  
@@ -48,11 +43,13 @@ app.post('/ai_analyze', async (req, res) => {
     Respond with a single integer (0–100), no extra text.
     
     Text:
-    \"${text}\"
+    "${text}"
     `.trim();
-    
 
   try {
+    const GROQ_KEY = process.env.GROQ_API_KEY;
+    const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
     const apiRes = await fetch(GROQ_URL, {
       method: 'POST',
       headers: {
@@ -66,18 +63,18 @@ app.post('/ai_analyze', async (req, res) => {
         max_tokens: 10
       })
     });
-    if (!apiRes.ok) throw new Error(`Status ${apiRes.status}`);
+
+    if (!apiRes.ok) {
+      throw new Error(`GROQ API error: ${apiRes.status}`);
+    }
 
     const { choices } = await apiRes.json();
     let prob = parseInt(choices[0].message.content.match(/\d+/)[0], 10);
     prob = Math.min(100, Math.max(0, prob));
 
     res.json({ probability: prob });
-  } catch (e) {
-    console.error(e);
+  } catch (error) {
+    console.error('Analysis error:', error);
     res.status(500).json({ error: 'Analysis failed' });
   }
-});
-
-const port = process.env.PORT || 3001;
-app.listen(port, () => console.log(`AI service running on ${port}`));
+}
